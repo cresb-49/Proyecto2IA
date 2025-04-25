@@ -67,9 +67,63 @@ class RedNeuronalApp(QWidget):
         layout.addWidget(param_group)
 
         self.accuracy_label = QLabel("Accuracy: ---")
-        layout.addWidget(self.accuracy_label)
+        accuracy_layout = QHBoxLayout()
+        accuracy_layout.addStretch()
+        accuracy_layout.addWidget(self.accuracy_label)
+        accuracy_layout.addStretch()
+
+        accuracy_layout.setContentsMargins(0, 5, 0, 5)
+
+        layout.addLayout(accuracy_layout)
+
+        self.test_group = QGroupBox("Probar con datos introducidos")
+        test_layout = QGridLayout()
+
+        self.input_x = QLineEdit()
+        self.input_y = QLineEdit()
+        self.test_btn = QPushButton("Probar")
+        self.test_btn.clicked.connect(self.probar_dato)
+        self.result_label = QLabel("Resultado: ---")
+
+        test_layout.addWidget(QLabel("Valor de X:"), 0, 0)
+        test_layout.addWidget(self.input_x, 0, 1)
+        test_layout.addWidget(QLabel("Valor de Y:"), 1, 0)
+        test_layout.addWidget(self.input_y, 1, 1)
+        test_layout.addWidget(self.test_btn, 2, 0, 1, 2)
+        test_layout.addWidget(self.result_label, 3, 0, 1, 2)
+
+        self.test_group.setLayout(test_layout)
+        self.test_group.setVisible(False)
+        layout.addWidget(self.test_group)
+
+        self.view_graphics_btn = QPushButton("Ver últimos gráficos generados")
+        self.view_graphics_btn.clicked.connect(self.mostrar_ultimos_graficos)
+        self.view_graphics_btn.setVisible(False)
+        layout.addWidget(self.view_graphics_btn)
 
         self.setLayout(layout)
+
+    def probar_dato(self):
+        try:
+            val_x = float(self.input_x.text())
+            val_y = float(self.input_y.text())
+        except ValueError:
+            QMessageBox.warning(self, "Entrada inválida", "Debes ingresar valores numéricos.")
+            return
+
+        if not hasattr(self, 'perceptron_entrenado'):
+            QMessageBox.warning(self, "Error", "Primero debes entrenar la red.")
+            return
+
+        # Escalar los datos ingresados manualmente
+        entrada = np.array([[val_x, val_y]])
+        entrada_escalada = self.scaler.transform(entrada)
+
+        # Hacer la predicción
+        prediccion = self.perceptron_entrenado.predecir(entrada_escalada)[0]
+
+        resultado = "Benigno (1)" if prediccion == 1 else "Maligno (0)"
+        self.result_label.setText(f"Resultado: {resultado}")
     
     def mostrar_frontera_decision(self, perceptron, scaler, feature_x, feature_y):
         X = self.df[[feature_x, feature_y]].values
@@ -126,6 +180,16 @@ class RedNeuronalApp(QWidget):
             split=split
         )
 
+        self.perceptron_entrenado = perceptron
+        self.scaler = scaler
+        self.feature_x = x_col
+        self.feature_y = y_col
+        self.ultimos_errores = errores
+
+        self.test_group.setVisible(True)
+
+        self.view_graphics_btn.setVisible(True)
+
         fig1 = Figure(figsize=(5, 4))
         ax = fig1.add_subplot(111)
         ax.plot(errores, label="Error")
@@ -140,6 +204,25 @@ class RedNeuronalApp(QWidget):
         self.mostrar_frontera_decision(perceptron , scaler, x_col, y_col)
 
         self.accuracy_label.setText(f"Accuracy: {accuracy*100:.2f}%")
+
+    def mostrar_ultimos_graficos(self):
+        if hasattr(self, 'error_window') and self.error_window:
+            self.error_window.close()
+        if hasattr(self, 'frontera_window') and self.frontera_window:
+            self.frontera_window.close()
+
+        fig1 = Figure(figsize=(5, 4))
+        ax1 = fig1.add_subplot(111)
+        ax1.plot(self.ultimos_errores, label="Error")
+        ax1.set_title("Error vs Épocas")
+        ax1.set_xlabel("Épocas")
+        ax1.set_ylabel("Error")
+        ax1.legend()
+        self.error_window = GraficaWindow(fig1, title="Error vs Épocas")
+
+        self.mostrar_frontera_decision(
+            self.perceptron_entrenado, self.scaler, self.feature_x, self.feature_y
+        )
 
     def cargar_datos(self):
         ruta = os.path.join(os.path.dirname(__file__), "..", "data", "breast_cancer_data.csv")
