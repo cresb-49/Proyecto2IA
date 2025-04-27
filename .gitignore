@@ -175,3 +175,4 @@ cython_debug/
 
 # Dowloaded files
 *.csv
+.DS_Store
